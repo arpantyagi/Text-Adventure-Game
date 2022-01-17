@@ -1,5 +1,7 @@
 :- dynamic here/1.
 :- dynamic have/1.
+:- dynamic door/2.
+:- dynamic ldoor/2.
 :- dynamic location/2.
 :- dynamic alive/1.
 :- dynamic health/1.
@@ -8,12 +10,33 @@
 
 :- ansi_format([bold,fg(green)],"Enter 'go.' to begin the 'Dungeon Escape'.", []).
 
-/*------------------Game Facts ------------------*/
+/*------------------Game Loop ------------------*/
 
 
 
 
+/*------------------Game Facts------------------*/
+here('Main Prison Corridor').
 
+:-
+assert(fact(player,alive)),
+assert(is_in('Aragog','Aragog"s Lair')),
+assert(is_in('Knight','Knight"s Room')),
+assert(is_in('Executioner','Execution Chamber')).
+
+
+
+
+/*------------------Game Shortcuts ------------------*/
+
+
+'Prison Cell' :- goto('Prison Cell').
+'Main Prison Corridor' :- goto('Main Prison Corridor').
+'Unlocked Prison Cell' :- goto('Unlocked Prison Cell').
+'Upper Dungeons' :- goto('Upper Dungeons').
+'Locked Prison Cell' :- goto('Locked Prison Cell').
+'Long Hall' :- goto('Long Hall').
+'Execution Chamber' :- goto('Execution Chamber').
 
 
 /*------------------Game Start------------------*/
@@ -38,10 +61,11 @@ welcome() :-
 room('Prison Cell').
 room('Main Prison Corridor').
 room('Unlocked Prison Cell').
-room('Locked Prison').
+room('Locked Prison Cell').
 room('Upper Dungeons').
 room('Long Hall').
 room('Execution Chamber').
+room('Key Room').
 room('Passageway').
 room('Armoury').
 room('Kitchen').
@@ -58,8 +82,8 @@ description('Prison Cell', 'Its Dark, Damp and Cold in the Cell, There seems not
 description('Main Prison Corridor', 'You have stepped out of your "Prison Cell" and into a long corridor, which has prison cells on both sides. Most of them are empty and contain skeleton of people who have died after spending their lives in this dungeon. You must not suffer the same fate. Its a very hard to see in the dark Corridor, the only source of light is the wooden torch on the wall, However you can see an "Unlocked Prison Cell" on the right. There is also a narrow stairway going to the "Upper Dungeons".').
 description('Unlocked Prison Cell','Looks Like someone was recently here, There are some "Apple" here that you might be able to eat. Be careful what you eat though! Eating the wrong things can decrease your Health!').
 
-description('Locked Prison','').
-
+description('Locked Prison Cell','').
+description('Key Room', '').
 description('Upper Dungeons','You enter a big Hall, It is dimly lit, The only source of light is the Fireplace adjacent to the stairway, there is a big Dining Table in the Center, There is some Rotting Meat on the Table. There is a Heavy Iron door on the front which leads to the "Guard Room", you can hear some footsteps and metal armour clanking. On the right there is a door that leads to the "Long Hall", you can hear someone talking there. On the left there is a wooden door which leads to the "Passageway".", ').
 description('Long Hall','It is very Dark, you can only see your surroundings thanks to the wooden torch, The walls are covered with portraits of the Devil and deomons of different kind, the floor is covered in dried blood, On the other end of there is a door that leads to the "Execution Room".').
 description('Execution Chamber','').
@@ -87,21 +111,26 @@ location('Metal Armour', 'Armoury').
 location('Knife', 'Kitchen').
 location('Potatoes', 'Kitchen').
 location('Hot Meal', 'Kitchen').
+location('Armoury Key', 'Key Room').
+location('Prison Key', 'Armoury').
 
 /*------------------Connecting Doorways------------------*/
 
 door('Prison Cell', 'Main Prison Corridor').
 door('Main Prison Corridor', 'Unlocked Prison Cell').
-door('Main Prison Corridor', 'Locked Prison Cell').
 door('Main Prison Corridor', 'Upper Dungeons').
 door('Upper Dungeons', 'Passageway').
 door('Upper Dungeons', 'Long Hall').
 door('Upper Dungeons', 'Knight"s Room').
 door('Long Hall', 'Execution Chamber').
 door('Passageway', 'Kitchen').
-door('Passageway', 'Armoury').
 door('Passageway', 'Aragog"s Lair').
 door('Knight"s Room', 'Tall Stairway').
+door('Tall Stairway', 'Tunnel').
+door('Tunnel', 'Outside').
+
+ldoor('Main Prison Corridor', 'Locked Prison Cell').
+ldoor('Passageway', 'Armoury').
 
 
 
@@ -110,6 +139,8 @@ door('Knight"s Room', 'Tall Stairway').
 connect(X, Y) :- door(X, Y).
 connect(X, Y) :- door(Y, X).
 
+connect(X, Y) :- ldoor(X, Y).
+connect(X, Y) :- ldoor(Y, X).
 
 /*------------------Ingestibles and Poison ------------------*/
 
@@ -120,13 +151,6 @@ edible('Cooked Potatoes').
 edible('Cold Soup').
 
 inedible('Rotten Meat').
-
-
-
-/*------------------Start Location------------------*/
-
-here('Prison Cell').
-
 
 
 /*------------------List all the Things in the Place------------------*/
@@ -169,8 +193,10 @@ look :-
 
 /*------------------Movement Procedures------------------*/
 goto(Place) :-
-	can_go(Place), 
-	move(Place), 
+	can_go(Place),
+	special(Place),  
+	move(Place),
+	game_status(),
 	look.
 
 can_go(Place) :-
@@ -191,6 +217,33 @@ can_go(_) :-
 move(Place) :- 
 	retract(here(_)), 
 	asserta(here(Place)).
+
+game_status() :-
+	here('Outside'),
+  	ansi_format([bold,fg(white),bg(yellow)], 'VICTORY you have escaped the Prison!', []), nl.
+game_status() :- 
+	true.
+
+special(Place) :-
+	ldoor('Main Prison Corridor' , Place),
+	have('Prison Key'),
+	retract(ldoor('Main Prison Corridor' , Place)),
+	asserta(door('Main Prison Corridor' , Place)),
+	retract(have('Prison Key')),
+	write('You have the Prison Keys in inventory, Prison Door Unlocked!'),nl,nl,!.
+special(Place) :-
+	ldoor('Passageway' , Place),
+	have('Armoury Key'),
+	retract(ldoor('Passageway' , Place)),
+	asserta(door('Passageway' , Place)),
+	retract(retract('Armoury Key')),
+	write('You have the Armoury Keys in inventory, Armoury Door Unlocked!'),nl,nl,!.
+special(Place) :-
+	ldoor(_, Place),
+	write('The Door is Locked!'),nl,
+	!, fail.
+special(_).
+
 
 
 /*------------------Taking Objects------------------*/
@@ -245,4 +298,17 @@ inventory :-
 	nl, 
 	fail).
 
-have('Something').
+/*------------------Game States------------------*/
+
+
+
+
+
+
+
+
+/*------------------Enemies------------------*/
+
+
+/*------------------Miscellaneous------------------*/
+have('Prison Key').
