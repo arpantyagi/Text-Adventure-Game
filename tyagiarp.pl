@@ -6,29 +6,17 @@
 :- dynamic alive/1.
 :- dynamic health/1.
 :- dynamic status/1.
-
+:- dynamic player/1.
 
 :- ansi_format([bold,fg(green)],"Enter 'go.' to begin the 'Dungeon Escape'.", []).
 
-/*------------------Game Loop ------------------*/
-
-
-
 
 /*------------------Game Facts------------------*/
-here('Main Prison Corridor').
-
-:-
-assert(fact(player,alive)),
-assert(is_in('Aragog','Aragog"s Lair')),
-assert(is_in('Knight','Knight"s Room')),
-assert(is_in('Executioner','Execution Chamber')).
-
-
+here('Knight"s Room').
+player('alive').
 
 
 /*------------------Game Shortcuts ------------------*/
-
 
 'Prison Cell' :- goto('Prison Cell').
 'Main Prison Corridor' :- goto('Main Prison Corridor').
@@ -37,11 +25,21 @@ assert(is_in('Executioner','Execution Chamber')).
 'Locked Prison Cell' :- goto('Locked Prison Cell').
 'Long Hall' :- goto('Long Hall').
 'Execution Chamber' :- goto('Execution Chamber').
-
+'Key Room' :- goto('Key Room').
+'Passageway' :- goto('Passageway').
+'Armoury' :- goto('Armoury').
+'Kitchen' :- goto('Kitchen').
+'Aragog"s Lair' :- goto('Aragog"s Lair').
+'Knight"s Room' :- goto('Knight"s Room').
+'Tall Stairway' :- goto('Tall Stairway').
+'Tunnel' :- goto('Tunnel').
+'Outside' :- goto('Outside').
 
 /*------------------Game Start------------------*/
 
-go :- welcome(), nl, look.
+go :- welcome(), nl, look.	
+	here('Knight"s Room').
+	player('alive').
 
 
 welcome() :- 
@@ -74,6 +72,7 @@ room('Knight"s Room').
 room('Tall Stairway').
 room('Tunnel').
 room('Outside').
+
 
 /*------------------Room Descriptions ------------------*/
 
@@ -113,6 +112,7 @@ location('Potatoes', 'Kitchen').
 location('Hot Meal', 'Kitchen').
 location('Armoury Key', 'Key Room').
 location('Prison Key', 'Armoury').
+location('teleport', 'Passageway').
 
 /*------------------Connecting Doorways------------------*/
 
@@ -123,6 +123,7 @@ door('Upper Dungeons', 'Passageway').
 door('Upper Dungeons', 'Long Hall').
 door('Upper Dungeons', 'Knight"s Room').
 door('Long Hall', 'Execution Chamber').
+door('Execution Chamber', 'Key Room').
 door('Passageway', 'Kitchen').
 door('Passageway', 'Aragog"s Lair').
 door('Knight"s Room', 'Tall Stairway').
@@ -152,6 +153,9 @@ edible('Cold Soup').
 
 inedible('Rotten Meat').
 
+/*------------------ Enemies and location ------------------*/
+enemy('Guard', 'Execution Chamber', 'Long Hall').
+enemy('Knight', 'Knight"s Room' , 'Upper Dungeons').
 
 /*------------------List all the Things in the Place------------------*/
 
@@ -194,7 +198,8 @@ look :-
 /*------------------Movement Procedures------------------*/
 goto(Place) :-
 	can_go(Place),
-	special(Place),  
+	special(Place),
+	enemies(Place),  
 	move(Place),
 	game_status(),
 	look.
@@ -220,9 +225,43 @@ move(Place) :-
 
 game_status() :-
 	here('Outside'),
-  	ansi_format([bold,fg(white),bg(yellow)], 'VICTORY you have escaped the Prison!', []), nl.
-game_status() :- 
+  	ansi_format([bold,fg(white),bg(yellow)], 'VICTORY you have escaped the Prison!', []), nl,
+  	false.
+game_status() :-
+	player('dead'),
+  	ansi_format([bold,fg(white),bg(yellow)], 'Defeat you Died!', []), nl,
+  	false.
+  	game_status() :- 
 	true.
+
+enemies(Place) :- 
+	here(X),
+	enemy('Knight', Place, X ),
+	have('Iron Sword'), 
+	retract(enemy('Knight', Place, X)),
+	retract(have('Iron Sword')),
+	write('Thankfully, you had the Iron Sword in your Inventory after an intense battle you were Luckliy able to beat the Knight.'), nl, nl, !.
+enemies(Place) :- 
+	here(X),
+	enemy('Knight', Place, X ),
+	retract(player('alive')),
+	asserta(player('dead')),
+	write('You barge into the Knight"s Room unprepared and you pay the price, the immediately attacks you and you are dead.'),nl,nl,!, 
+	halt.
+enemies(Place) :- 
+	here(X),
+	enemy('Guard', Place, X ),
+	have('Kitchen Knife'), 
+	retract(enemy('Guard', Place, X)),
+	write('Thankfully, the Guard was unarmed and you were able to kill him with the Kitchen Knife, you picked up earlier.'), nl, nl, !.
+enemies(Place) :- 
+	here(X),
+	enemy('Guard', Place, X ),
+	retract(player('alive')),
+	asserta(player('dead')),
+	write('You go to the execution room and are face to face with a guard after an intense battle he pins you to the ground and beats you to death.'),nl,nl,!,
+	halt.
+enemies(_).
 
 special(Place) :-
 	ldoor('Main Prison Corridor' , Place),
@@ -236,7 +275,7 @@ special(Place) :-
 	have('Armoury Key'),
 	retract(ldoor('Passageway' , Place)),
 	asserta(door('Passageway' , Place)),
-	retract(retract('Armoury Key')),
+	retract(have('Armoury Key')),
 	write('You have the Armoury Keys in inventory, Armoury Door Unlocked!'),nl,nl,!.
 special(Place) :-
 	ldoor(_, Place),
@@ -245,6 +284,17 @@ special(Place) :-
 special(_).
 
 
+use :- 
+	have('teleport'),
+	retract(here(X)),
+	retract(have('teleport')),
+	asserta(location('teleport', 'Passageway')),
+	asserta(here('Passageway')),
+	write('You have been magically teleported back to the Passageway.').
+	look.
+have('teleport').
+
+/*------------------Enemies------------------*/
 
 /*------------------Taking Objects------------------*/
 
@@ -278,7 +328,7 @@ drop(X) :-
 in_inventory(X) :-
 	have(X),!.
 in_inventory(X) :-
-	write('You don not have '), write(X), write('in inventory.'),
+	write('You don not have '), write(X), write(' in inventory.'),
 	nl, fail.
 
 drop_object(X) :-
@@ -311,4 +361,3 @@ inventory :-
 
 
 /*------------------Miscellaneous------------------*/
-have('Prison Key').
