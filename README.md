@@ -1,6 +1,6 @@
 # Text Adventure in Prolog
 
-This is one of the Project I did for the Course BIE-PPA (Programming Paradigm). 
+> This project was done as a part of Programming Paradigms course at the Czech Technical University, Prague.
 
 [Here is the Link to the Task on Course Page ](https://courses.fit.cvut.cz/BIE-PPA/projects/adventure.html)
 
